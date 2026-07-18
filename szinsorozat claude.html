@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Színsorozat - Memóriajáték</title>
+
+<!-- ======================= CSS ======================= -->
+<style>
+  :root {
+    --bg-card: #eef6ea;
+    --border-card: #4f7cac;
+    --text-dark: #2d3a2e;
+    --accent-yellow: #ffcf4d;
+    --accent-green: #1fa851;
+    --success: #2e9e3e;
+    --fail: #d64545;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    font-family: 'Trebuchet MS', 'Segoe UI', Verdana, sans-serif;
+    background: linear-gradient(160deg, #fdf6e3 0%, #eaf4ff 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 16px;
+    color: var(--text-dark);
+  }
+
+  /* Fő kártya, ami a mintaképen látható zöldes keretet idézi */
+  .game-card {
+    background: var(--bg-card);
+    border: 4px solid var(--border-card);
+    border-radius: 32px;
+    padding: 32px 24px;
+    max-width: 680px;
+    width: 100%;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    text-align: center;
+  }
+
+  h1 {
+    margin-top: 0;
+    font-size: 2rem;
+    color: #355c3a;
+    letter-spacing: 1px;
+  }
+
+  .phase-label {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin: 18px 0 10px;
+    color: #3a5a3f;
+  }
+
+  /* Kör-sorok (megjegyzendő szín, kitöltendő szín) közös stílusa */
+  .circle-row {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  .circle {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 4px solid #222;
+    background: #ffffff;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  /* Kitöltendő üres körök kattinthatóak */
+  .circle.slot {
+    cursor: pointer;
+  }
+
+  .circle.slot:hover {
+    transform: scale(1.06);
+  }
+
+  .circle.slot.selected {
+    box-shadow: 0 0 0 5px var(--accent-yellow);
+    transform: scale(1.08);
+  }
+
+  /* Választható színek sora */
+  .palette-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 10px 0 22px;
+  }
+
+  .palette-color {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 3px solid #222;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+
+  .palette-color:hover {
+    transform: scale(1.15);
+  }
+
+  .palette-color.white-swatch {
+    border: 3px solid #999;
+  }
+
+  /* Vezérlő gombok */
+  .controls {
+    margin-top: 10px;
+  }
+
+  button.action-btn {
+    font-size: 1.1rem;
+    font-weight: bold;
+    padding: 12px 28px;
+    border-radius: 18px;
+    border: none;
+    cursor: pointer;
+    color: white;
+    background: var(--accent-green);
+    margin: 6px;
+    transition: opacity 0.2s ease, transform 0.15s ease;
+  }
+
+  button.action-btn:hover:not(:disabled) {
+    transform: scale(1.04);
+  }
+
+  button.action-btn:disabled {
+    background: #a9c9ad;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  button.secondary-btn {
+    background: #6a8fc7;
+  }
+
+  .timer-text {
+    font-size: 0.95rem;
+    color: #55705a;
+    min-height: 22px;
+    margin-bottom: 6px;
+  }
+
+  /* Felugró üzenet (modális ablak) */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+
+  .modal-overlay.visible {
+    display: flex;
+  }
+
+  .modal-box {
+    background: white;
+    border-radius: 24px;
+    padding: 28px 26px;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+
+  .modal-box.success {
+    border: 5px solid var(--success);
+  }
+
+  .modal-box.fail {
+    border: 5px solid var(--fail);
+  }
+
+  .modal-box p.message {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin: 6px 0 14px;
+  }
+
+  .correct-sequence-label {
+    font-weight: bold;
+    margin-bottom: 8px;
+  }
+
+  @media (max-width: 480px) {
+    .circle { width: 54px; height: 54px; }
+    .palette-color { width: 38px; height: 38px; }
+    h1 { font-size: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= HTML ======================= -->
+<div class="game-card">
+  <h1>🎨 Színsorozat</h1>
+
+  <div class="phase-label">1. fázis: Jegyezd meg a színsort!</div>
+  <div class="timer-text" id="timerText"></div>
+  <div class="circle-row" id="sequenceRow"><!-- ide kerülnek a megjegyzendő színkörök --></div>
+
+  <div class="phase-label">2. fázis: Add meg a színsort ugyanabban a sorrendben!</div>
+  <div class="circle-row" id="slotRow"><!-- ide kerülnek a kitöltendő üres körök --></div>
+
+  <div class="phase-label">Választható színek</div>
+  <div class="palette-row" id="paletteRow"><!-- ide kerülnek a választható színgombok --></div>
+
+  <div class="controls">
+    <button class="action-btn" id="checkBtn" disabled>ELLENŐRZÉS</button>
+    <button class="action-btn secondary-btn" id="newGameBtn">Új játék</button>
+  </div>
+</div>
+
+<!-- Felugró üzenet ablak -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box" id="modalBox">
+    <p class="message" id="modalMessage"></p>
+    <div id="modalCorrectSequence"></div>
+    <button class="action-btn" id="modalCloseBtn">Rendben</button>
+  </div>
+</div>
+
+<!-- ======================= JAVASCRIPT ======================= -->
+<script>
+  // A választható 8 alapszín (árnyalatok nélkül), névvel az akadálymentesség/kényelmi ok miatt
+  const PALETTE = [
+    { name: 'sárga',   hex: '#ffcf4d' },
+    { name: 'zöld',    hex: '#1fa851' },
+    { name: 'kék',     hex: '#2f7fd6' },
+    { name: 'barna',   hex: '#b5651d' },
+    { name: 'lila',    hex: '#7b4fa0' },
+    { name: 'fekete',  hex: '#1c1c1c' },
+    { name: 'fehér',   hex: '#ffffff' },
+    { name: 'piros',   hex: '#cc1f1f' }
+  ];
+
+  const SEQUENCE_VISIBLE_MS = 8000; // a színsor 8 másodpercig látható
+  const SEQUENCE_LENGTH = 4;        // 4 különböző színből áll a sor
+
+  // Állapot-változók
+  let correctSequence = [];   // a megjegyzendő (helyes) színsor
+  let playerAnswer = [null, null, null, null]; // a játékos által kiválasztott színek
+  let selectedSlotIndex = null; // melyik üres kört választotta ki a játékos éppen
+
+  // DOM elemek
+  const sequenceRow = document.getElementById('sequenceRow');
+  const slotRow = document.getElementById('slotRow');
+  const paletteRow = document.getElementById('paletteRow');
+  const checkBtn = document.getElementById('checkBtn');
+  const newGameBtn = document.getElementById('newGameBtn');
+  const timerText = document.getElementById('timerText');
+  const modalOverlay = document.getElementById('modalOverlay');
+  const modalBox = document.getElementById('modalBox');
+  const modalMessage = document.getElementById('modalMessage');
+  const modalCorrectSequence = document.getElementById('modalCorrectSequence');
+  const modalCloseBtn = document.getElementById('modalCloseBtn');
+
+  // Segédfüggvény: tömb véletlenszerű keverése (Fisher-Yates módszer)
+  function shuffleArray(array) {
+    const arr = array.slice();
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  // Új játék indítása: véletlenszerű 4 különböző szín kiválasztása
+  function startNewGame() {
+    correctSequence = shuffleArray(PALETTE).slice(0, SEQUENCE_LENGTH);
+    playerAnswer = [null, null, null, null];
+    selectedSlotIndex = null;
+
+    renderSequenceRow(true);   // színek láthatóak
+    renderSlotRow();          // üres körök (kitöltés elrejtve, amíg fázis 1 tart)
+    renderPalette();
+    checkBtn.disabled = true;
+
+    // A választható színek sorát véletlenszerű sorrendbe keverjük,
+    // de biztosítjuk, hogy a 4 eredeti szín mindig szerepeljen (ez garantált, mert a teljes 8 színből válogatunk)
+    startCountdown();
+  }
+
+  // 1. fázis: a megjegyzendő színsor megjelenítése / elrejtése
+  function renderSequenceRow(visible) {
+    sequenceRow.innerHTML = '';
+    correctSequence.forEach(color => {
+      const circle = document.createElement('div');
+      circle.className = 'circle';
+      circle.style.background = visible ? color.hex : '#ffffff';
+      if (!visible) {
+        circle.style.borderStyle = 'dashed';
+      }
+      sequenceRow.appendChild(circle);
+    });
+  }
+
+  // 2. fázis: a kitöltendő üres körök megjelenítése
+  function renderSlotRow() {
+    slotRow.innerHTML = '';
+    playerAnswer.forEach((color, index) => {
+      const circle = document.createElement('div');
+      circle.className = 'circle slot';
+      circle.style.background = color ? color.hex : '#ffffff';
+      if (selectedSlotIndex === index) {
+        circle.classList.add('selected');
+      }
+      circle.addEventListener('click', () => selectSlot(index));
+      slotRow.appendChild(circle);
+    });
+  }
+
+  // A választható színek gombjainak megjelenítése
+  function renderPalette() {
+    paletteRow.innerHTML = '';
+    PALETTE.forEach(color => {
+      const btn = document.createElement('div');
+      btn.className = 'palette-color';
+      if (color.name === 'fehér') {
+        btn.classList.add('white-swatch');
+      }
+      btn.style.background = color.hex;
+      btn.title = color.name;
+      btn.addEventListener('click', () => chooseColor(color));
+      paletteRow.appendChild(btn);
+    });
+  }
+
+  // Amikor a játékos rákattint egy üres körre, azt kijelöljük
+  function selectSlot(index) {
+    selectedSlotIndex = index;
+    renderSlotRow();
+  }
+
+  // Amikor a játékos rákattint egy színre, a kiválasztott kör felveszi azt a színt
+  function chooseColor(color) {
+    if (selectedSlotIndex === null) {
+      return; // előbb kört kell választani
+    }
+    playerAnswer[selectedSlotIndex] = color;
+
+    // Automatikusan a következő üres körre lépünk (ha van ilyen)
+    const nextEmptyIndex = playerAnswer.findIndex((c, i) => c === null && i > selectedSlotIndex);
+    if (nextEmptyIndex !== -1) {
+      selectedSlotIndex = nextEmptyIndex;
+    } else {
+      const anyEmptyIndex = playerAnswer.findIndex(c => c === null);
+      selectedSlotIndex = anyEmptyIndex !== -1 ? anyEmptyIndex : null;
+    }
+
+    renderSlotRow();
+    updateCheckButtonState();
+  }
+
+  // Az ELLENŐRZÉS gomb csak akkor aktív, ha mind a 4 kör ki van töltve
+  function updateCheckButtonState() {
+    const allFilled = playerAnswer.every(c => c !== null);
+    checkBtn.disabled = !allFilled;
+  }
+
+  // Visszaszámláló a színsor 8 másodperces láthatóságához
+  function startCountdown() {
+    let secondsLeft = Math.ceil(SEQUENCE_VISIBLE_MS / 1000);
+    timerText.textContent = `A színsor eltűnik ${secondsLeft} másodperc múlva...`;
+
+    const intervalId = setInterval(() => {
+      secondsLeft--;
+      if (secondsLeft > 0) {
+        timerText.textContent = `A színsor eltűnik ${secondsLeft} másodperc múlva...`;
+      } else {
+        clearInterval(intervalId);
+      }
+    }, 1000);
+
+    // 8 másodperc után a színsor eltűnik, helyette üres körök maradnak láthatóak
+    setTimeout(() => {
+      renderSequenceRow(false);
+      timerText.textContent = 'Most add meg a színeket a lenti gombokkal!';
+    }, SEQUENCE_VISIBLE_MS);
+  }
+
+  // Az ELLENŐRZÉS gomb megnyomásakor a válaszok összehasonlítása a helyes sorral
+  function checkAnswer() {
+    const isCorrect = playerAnswer.every((color, index) => color.hex === correctSequence[index].hex);
+
+    if (isCorrect) {
+      showModal(true, 'Gratulálok! Hibátlanul megoldottad a feladatot! 🎉');
+    } else {
+      showModal(false, 'Most nem sikerült. Próbáld meg újra! 😊');
+    }
+  }
+
+  // Felugró üzenet megjelenítése
+  function showModal(success, message) {
+    modalBox.classList.remove('success', 'fail');
+    modalBox.classList.add(success ? 'success' : 'fail');
+    modalMessage.textContent = message;
+
+    modalCorrectSequence.innerHTML = '';
+    if (!success) {
+      // Hibás megoldás esetén megjelenítjük a helyes színsort is
+      const label = document.createElement('div');
+      label.className = 'correct-sequence-label';
+      label.textContent = 'A helyes színsor:';
+      modalCorrectSequence.appendChild(label);
+
+      const row = document.createElement('div');
+      row.className = 'circle-row';
+      correctSequence.forEach(color => {
+        const circle = document.createElement('div');
+        circle.className = 'circle';
+        circle.style.background = color.hex;
+        row.appendChild(circle);
+      });
+      modalCorrectSequence.appendChild(row);
+    }
+
+    modalOverlay.classList.add('visible');
+  }
+
+  function closeModal() {
+    modalOverlay.classList.remove('visible');
+  }
+
+  // Eseményfigyelők bekötése
+  checkBtn.addEventListener('click', checkAnswer);
+  newGameBtn.addEventListener('click', startNewGame);
+  modalCloseBtn.addEventListener('click', closeModal);
+
+  // A játék automatikus indítása betöltéskor
+  startNewGame();
+</script>
+
+</body>
+</html>
